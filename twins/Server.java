@@ -1,13 +1,13 @@
 package twins;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 
 public class Server {
 
@@ -15,6 +15,12 @@ public class Server {
 
     private Writer writer;
     private SERVER_PROTOCOL server_state;
+    private File dbFile;
+    private FileReader fileReader;
+    private FileWriter fileWriter;
+    private BufferedReader bufferedReader;
+    private PrintWriter printWriter;
+    private String tmpName;
 
     /**
      * Initialise a new Twins server. To start the server, call start().
@@ -31,10 +37,10 @@ public class Server {
         RECEIVE_REQ;
     }
 
-    public static final String ERROR_ONE = "Error 1 : Invalid Name";
-    public static final String ERROR_TWO = "Error 2 : Invalid Date";
-    public static final String ERROR_THREE = "Error 3 : Name in use";
-    public static final String ERROR_ZERO = "Error 0 : Welcome to void!";
+    public static final String ERROR_ONE = "Error 1";
+    public static final String ERROR_TWO = "Error 2";
+    public static final String ERROR_THREE = "Error 3";
+    public static final String ERROR_ZERO = "Error 0";
     /**
      * Start the server.
      * @throws IOException 
@@ -51,6 +57,35 @@ public class Server {
         }
     }
 
+    public ArrayList<String> checkTwin(String dob) {
+        ArrayList<String> tmpList = new ArrayList<>();
+        try {
+            fileReader = new FileReader(dbFile);
+            bufferedReader = new BufferedReader(fileReader);
+            String line = bufferedReader.readLine();
+            while (line != null) {
+                String[] tokens = line.split(",");
+                String tmpDate = tokens[1];
+                if (tmpDate.equals(dob)) {
+                    tmpName = tokens[0];
+                    tmpList.add(tmpName);
+                }
+                line = bufferedReader.readLine();
+            }
+            return tmpList;
+        } catch (IOException e) {
+            System.out.println("Error reading from file");
+        }
+        return tmpList;
+    }
+
+    public void storeUserDetails(String name, String dob) throws IOException {
+        dbFile = new File("db.txt");
+        fileWriter = new FileWriter(dbFile, true);
+        fileWriter.write(name + "," + dob + "\n");
+        fileWriter.close();
+    }
+
     /**
      * Run a Twins protocol session over an established network connection.
      * @param connection the network connection
@@ -58,6 +93,10 @@ public class Server {
      */
     public void session(Socket connection) throws IOException {
         String clientInput;
+        String clientDate;
+        Date date = new Date();
+        ArrayList<String> listOfNames;
+        SimpleDateFormat format = new SimpleDateFormat("dd:mm:yyyy");
         writer = new OutputStreamWriter(connection.getOutputStream());
         BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
         
@@ -65,7 +104,7 @@ public class Server {
         clientInput = reader.readLine();
         clientInput.replaceAll(" ","");
         if (!(clientInput.equals("Hello"))) {
-            sendMessage(ERROR_ONE);
+            sendMessage(ERROR_ZERO);
             connection.close();
         }
         
@@ -73,15 +112,47 @@ public class Server {
         server_state = SERVER_PROTOCOL.RECEIVE_NAME;
         clientInput = reader.readLine();
         clientInput.replaceAll(" ","");
+        String tmpdate = " ";
         // Continue
 
         // Checking for date
+        server_state = SERVER_PROTOCOL.RECEIVE_DATE;
+        sendMessage("What is your DOB");
+        clientDate = reader.readLine();
 
-            
+        SimpleDateFormat fromUser = new SimpleDateFormat("dd:MM:yyyy");
+        SimpleDateFormat myFormat = new SimpleDateFormat("dd:MM:yyyy");
+        SimpleDateFormat testFormart = new SimpleDateFormat("yyyy");
 
-            
+        try {
+            String reformattedStr = myFormat.format(fromUser.parse(clientDate));
+            String testString = testFormart.format(fromUser.parse(clientDate));
+            if ((Integer.parseInt(testString) > 1850) && (Integer.parseInt(testString) < 2020)) {
+                System.out.println(testString);
+                System.out.println(reformattedStr);
+                tmpdate = reformattedStr;
+                storeUserDetails(clientInput, reformattedStr);
+            } else {
+                sendMessage(ERROR_TWO);
+            }
+        } catch (ParseException e) {
+            sendMessage(ERROR_TWO);
+            e.printStackTrace();
+        }
+
+        sendMessage("BEGIN TWIN");
+        // check twin func
+         listOfNames = checkTwin(tmpdate);
+         for (int i = 0; i < listOfNames.size(); i++) {
+             System.out.println(listOfNames.get(i));
+             sendMessage(listOfNames.get(i));
+         }
+        sendMessage("END TWIN");
+
         System.out.println("Closing connection");
         connection.close();
+
+
     }
 
     /**
