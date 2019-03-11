@@ -86,6 +86,30 @@ public class Server {
         fileWriter.close();
     }
 
+    public void requestOption(Socket connection, ArrayList<String> listOfNames, String tmpdate, BufferedReader reader) throws IOException
+    {
+        String clientRequest = reader.readLine();
+
+        switch (clientRequest) {
+            case "Quit" :
+                connection.close();
+                break;
+            case "Refresh" :
+                listOfNames = checkTwin(tmpdate);
+                for (int i = 0; i < listOfNames.size(); i++) {
+                    System.out.println(listOfNames.get(i));
+                    sendMessage(listOfNames.get(i));
+                }
+                requestOption(connection, listOfNames, tmpdate, reader);
+                break;
+            case "Delete me" :
+                sendMessage("Fk you no deleting here");
+                break;
+            default :
+                break;
+        }
+    }
+
     /**
      * Run a Twins protocol session over an established network connection.
      * @param connection the network connection
@@ -95,6 +119,7 @@ public class Server {
         String clientInput;
         String clientDate;
         Date date = new Date();
+        String clientRequest;
         ArrayList<String> listOfNames;
         SimpleDateFormat format = new SimpleDateFormat("dd:mm:yyyy");
         writer = new OutputStreamWriter(connection.getOutputStream());
@@ -149,10 +174,13 @@ public class Server {
          }
         sendMessage("END TWIN");
 
+         server_state = SERVER_PROTOCOL.RECEIVE_REQ;
+
+         requestOption(connection, listOfNames, tmpdate, reader);
+         
+
         System.out.println("Closing connection");
         connection.close();
-
-
     }
 
     /**
