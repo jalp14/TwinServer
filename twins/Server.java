@@ -26,6 +26,7 @@ public class Server {
     private PrintWriter printWriter;
     private String tmpName;
     private String clientInput;
+    private String tmpDate;
 
     /**
      * Initialise a new Twins server. To start the server, call start().
@@ -64,8 +65,36 @@ public class Server {
         }
     }
 
+    public ArrayList<String> checkName(String name) {
+        // create ArrayList to temporarily store all the user's DOB
+        dbFile = new File("dB.txt");
+        ArrayList<String> tmpList = new ArrayList<>();
+        try {
+            fileReader = new FileReader(dbFile);
+            bufferedReader = new BufferedReader(fileReader);
+            // Read data from file line by line
+            String line = bufferedReader.readLine();
+            while (line != null) {
+                // Split data into tokens separated by comma
+                String[] tokens = line.split(",");
+                // get the name and add it to the arraylist
+                tmpName = tokens[0];
+                if (tmpName.equals(name)) {
+                    tmpDate = tokens[1];
+                    tmpList.add(tmpName);
+                }
+                line = bufferedReader.readLine();
+            }
+            return tmpList;
+        } catch (IOException e) {
+            System.out.println("Error reading from file");
+        }
+        return tmpList;
+    }
+
     public ArrayList<String> checkTwin(String dob) {
         // create ArrayList to temporarily store all the user's DOB
+        dbFile = new File("dB.txt");
         ArrayList<String> tmpList = new ArrayList<>();
         try {
             fileReader = new FileReader(dbFile);
@@ -78,6 +107,7 @@ public class Server {
                 // get the date and add it to the arraylist
                 String tmpDate = tokens[1];
                 if (tmpDate.equals(dob)) {
+                    System.out.println(tmpName);
                     tmpName = tokens[0];
                     tmpList.add(tmpName);
                 }
@@ -167,23 +197,27 @@ public class Server {
         server_state = SERVER_PROTOCOL.RECEIVE_NAME;
         clientInput = reader.readLine();
         clientInput.replaceAll(" ","");
-        String tmpdate = " ";
+        //String tmpdate = " ";
         // Continue
 
         // Check if name exists
         boolean nameExists = false;
-        listOfNames = checkTwin(tmpdate);
+        listOfNames = checkName(clientInput);
+        System.out.println("listOfNames size: " + listOfNames.size());
         for (int i = 0; i < listOfNames.size(); i++) {
+            System.out.println("ClientInput: " + clientInput + " ,Name: " + listOfNames.get(i));
             if (clientInput.equals(listOfNames.get(i))) {
                 nameExists = true;
             } else {
                 nameExists = false;
             }
         }
+        System.out.println("Name exists: " + nameExists);
+
         if (nameExists) {
             sendMessage("BEGIN TWIN");
             // check twin func
-            listOfNames = checkTwin(tmpdate);
+            listOfNames = checkTwin(tmpDate);
             for (int i = 0; i < listOfNames.size(); i++) {
                 System.out.println(listOfNames.get(i));
                 sendMessage(listOfNames.get(i));
@@ -192,7 +226,7 @@ public class Server {
 
             server_state = SERVER_PROTOCOL.RECEIVE_REQ;
 
-            requestOption(connection, listOfNames, tmpdate, reader);
+            requestOption(connection, listOfNames, tmpDate, reader);
 
 
             System.out.println("Closing connection");
@@ -212,7 +246,7 @@ public class Server {
                 if ((Integer.parseInt(testString) > 1850) && (Integer.parseInt(testString) < 2020)) {
                     System.out.println(testString);
                     System.out.println(reformattedStr);
-                    tmpdate = reformattedStr;
+                    tmpDate = reformattedStr;
                     storeUserDetails(clientInput, reformattedStr);
                 } else {
                     sendMessage(ERROR_TWO);
@@ -224,7 +258,7 @@ public class Server {
 
             sendMessage("BEGIN TWIN");
             // check twin func
-            listOfNames = checkTwin(tmpdate);
+            listOfNames = checkTwin(tmpDate);
             for (int i = 0; i < listOfNames.size(); i++) {
                 System.out.println(listOfNames.get(i));
                 sendMessage(listOfNames.get(i));
@@ -233,7 +267,7 @@ public class Server {
 
             server_state = SERVER_PROTOCOL.RECEIVE_REQ;
 
-            requestOption(connection, listOfNames, tmpdate, reader);
+            requestOption(connection, listOfNames, tmpDate, reader);
 
 
             System.out.println("Closing connection");
