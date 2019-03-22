@@ -188,7 +188,7 @@ public class Server {
         // Checking for name
         clientInput = reader.readLine();
         clientInput.replaceAll(" ","");
-        if (!(clientInput.equals("Hello"))) {
+        if (!(clientInput.toLowerCase().equals("hello"))) {
             sendMessage(ERROR_ZERO);
             connection.close();
         }
