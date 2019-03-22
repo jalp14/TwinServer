@@ -35,6 +35,7 @@ public class Server {
         this.port = port;
     }
 
+    // Using enum to represent the different states of the server
     public enum SERVER_PROTOCOL {
         NEW,
         RECEIVE_NAME,
@@ -42,6 +43,7 @@ public class Server {
         RECEIVE_REQ;
     }
 
+    // Types of errors the server can throw
     public static final String ERROR_ONE = "Error 1";
     public static final String ERROR_TWO = "Error 2";
     public static final String ERROR_THREE = "Error 3";
@@ -63,13 +65,17 @@ public class Server {
     }
 
     public ArrayList<String> checkTwin(String dob) {
+        // create ArrayList to temporarily store all the user's DOB
         ArrayList<String> tmpList = new ArrayList<>();
         try {
             fileReader = new FileReader(dbFile);
             bufferedReader = new BufferedReader(fileReader);
+            // Read data from file line by line
             String line = bufferedReader.readLine();
             while (line != null) {
+                // Split data into tokens separated by comma
                 String[] tokens = line.split(",");
+                // get the date and add it to the arraylist
                 String tmpDate = tokens[1];
                 if (tmpDate.equals(dob)) {
                     tmpName = tokens[0];
@@ -85,19 +91,28 @@ public class Server {
     }
 
     public void storeUserDetails(String name, String dob) throws IOException {
+        // Assign the file
         dbFile = new File("db.txt");
+        // preapre the file writer and set it to append
         fileWriter = new FileWriter(dbFile, true);
+        // write the name and the dob to the file
         fileWriter.write(name + "," + dob + "\n");
+        // close the file to save chagnes
         fileWriter.close();
     }
 
 
     public void deleteUser(String lineToDelete)throws IOException {
-            File file = new File("db.txt");
-            List<String> out = Files.lines(file.toPath())
-                    .filter(line -> !line.contains(lineToDelete))
-                    .collect(Collectors.toList());
-            Files.write(file.toPath(), out, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+            // Assign the file
+            File tmpFile = new File("db.txt");
+            /*
+             Load all the file data into local memory
+             Separate each line as different tokens and apply a filter to isolate the line we are looking for
+             Remove the line we are looking for
+             */
+            List<String> fileTokens = Files.lines(tmpFile.toPath()).filter(line -> !(line.contains(lineToDelete))).collect(Collectors.toList());
+            // Write data in memory back to the file and save it by using the truncate option
+            Files.write(tmpFile.toPath(), fileTokens, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
 
@@ -155,47 +170,77 @@ public class Server {
         String tmpdate = " ";
         // Continue
 
-        // Checking for date
-        server_state = SERVER_PROTOCOL.RECEIVE_DATE;
-        sendMessage("What is your DOB");
-        clientDate = reader.readLine();
-
-        SimpleDateFormat fromUser = new SimpleDateFormat("dd:MM:yyyy");
-        SimpleDateFormat myFormat = new SimpleDateFormat("dd:MM:yyyy");
-        SimpleDateFormat testFormart = new SimpleDateFormat("yyyy");
-
-        try {
-            String reformattedStr = myFormat.format(fromUser.parse(clientDate));
-            String testString = testFormart.format(fromUser.parse(clientDate));
-            if ((Integer.parseInt(testString) > 1850) && (Integer.parseInt(testString) < 2020)) {
-                System.out.println(testString);
-                System.out.println(reformattedStr);
-                tmpdate = reformattedStr;
-                storeUserDetails(clientInput, reformattedStr);
+        // Check if name exists
+        boolean nameExists = false;
+        listOfNames = checkTwin(tmpdate);
+        for (int i = 0; i < listOfNames.size(); i++) {
+            if (clientInput.equals(listOfNames.get(i))) {
+                nameExists = true;
             } else {
-                sendMessage(ERROR_TWO);
+                nameExists = false;
             }
-        } catch (ParseException e) {
-            sendMessage(ERROR_TWO);
-            e.printStackTrace();
         }
+        if (nameExists) {
+            sendMessage("BEGIN TWIN");
+            // check twin func
+            listOfNames = checkTwin(tmpdate);
+            for (int i = 0; i < listOfNames.size(); i++) {
+                System.out.println(listOfNames.get(i));
+                sendMessage(listOfNames.get(i));
+            }
+            sendMessage("END TWIN");
 
-        sendMessage("BEGIN TWIN");
-        // check twin func
-         listOfNames = checkTwin(tmpdate);
-         for (int i = 0; i < listOfNames.size(); i++) {
-             System.out.println(listOfNames.get(i));
-             sendMessage(listOfNames.get(i));
-         }
-        sendMessage("END TWIN");
+            server_state = SERVER_PROTOCOL.RECEIVE_REQ;
 
-         server_state = SERVER_PROTOCOL.RECEIVE_REQ;
-
-         requestOption(connection, listOfNames, tmpdate, reader);
+            requestOption(connection, listOfNames, tmpdate, reader);
 
 
-        System.out.println("Closing connection");
-        connection.close();
+            System.out.println("Closing connection");
+            connection.close();
+        } else {
+            server_state = SERVER_PROTOCOL.RECEIVE_DATE;
+            sendMessage("What is your DOB");
+            clientDate = reader.readLine();
+
+            SimpleDateFormat fromUser = new SimpleDateFormat("dd:MM:yyyy");
+            SimpleDateFormat myFormat = new SimpleDateFormat("dd:MM:yyyy");
+            SimpleDateFormat testFormart = new SimpleDateFormat("yyyy");
+
+            try {
+                String reformattedStr = myFormat.format(fromUser.parse(clientDate));
+                String testString = testFormart.format(fromUser.parse(clientDate));
+                if ((Integer.parseInt(testString) > 1850) && (Integer.parseInt(testString) < 2020)) {
+                    System.out.println(testString);
+                    System.out.println(reformattedStr);
+                    tmpdate = reformattedStr;
+                    storeUserDetails(clientInput, reformattedStr);
+                } else {
+                    sendMessage(ERROR_TWO);
+                }
+            } catch (ParseException e) {
+                sendMessage(ERROR_TWO);
+                e.printStackTrace();
+            }
+
+            sendMessage("BEGIN TWIN");
+            // check twin func
+            listOfNames = checkTwin(tmpdate);
+            for (int i = 0; i < listOfNames.size(); i++) {
+                System.out.println(listOfNames.get(i));
+                sendMessage(listOfNames.get(i));
+            }
+            sendMessage("END TWIN");
+
+            server_state = SERVER_PROTOCOL.RECEIVE_REQ;
+
+            requestOption(connection, listOfNames, tmpdate, reader);
+
+
+            System.out.println("Closing connection");
+            connection.close();
+        }
+        // Checking for date
+
     }
 
     /**
