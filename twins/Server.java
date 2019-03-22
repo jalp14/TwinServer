@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.text.ParseException;
@@ -22,11 +23,14 @@ public class Server {
     private File dbFile;
     private FileReader fileReader;
     private FileWriter fileWriter;
+    private BufferedReader reader;
     private BufferedReader bufferedReader;
     private PrintWriter printWriter;
     private String tmpName;
     private String clientInput;
     private String tmpDate;
+    private ServerSocket serverSocket;
+    private Socket conn;
 
     /**
      * Initialise a new Twins server. To start the server, call start().
@@ -54,14 +58,20 @@ public class Server {
      * @throws IOException 
      */
     public void start() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+        try{
             while (true) {
+                if(serverSocket == null) {
+                    serverSocket = new ServerSocket(port);
+                }
                 server_state = SERVER_PROTOCOL.NEW;
                 System.out.println("Server listening on port: " + port);
-                Socket conn= serverSocket.accept();
+                conn= serverSocket.accept();
                 System.out.println("Connected to " + conn.getInetAddress() + ":" + conn.getPort());
                 session(conn);
             }
+        }catch (SocketException se)
+        {
+            se.printStackTrace();
         }
     }
 
@@ -177,104 +187,111 @@ public class Server {
      */
     public void session(Socket connection) throws IOException {
 
-        String clientDate;
-        Date date = new Date();
-        String clientRequest;
-        ArrayList<String> listOfNames;
-        SimpleDateFormat format = new SimpleDateFormat("dd:mm:yyyy");
-        writer = new OutputStreamWriter(connection.getOutputStream());
-        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-        
-        // Checking for name
-        clientInput = reader.readLine();
-        clientInput.replaceAll(" ","");
-        if (!(clientInput.toLowerCase().equals("hello"))) {
-            sendMessage(ERROR_ZERO);
-            connection.close();
-        }
-        
-        sendMessage("What is your name ?");
-        server_state = SERVER_PROTOCOL.RECEIVE_NAME;
-        clientInput = reader.readLine();
-        clientInput.replaceAll(" ","");
-        //String tmpdate = " ";
-        // Continue
+        try {
+            String clientDate;
+            Date date = new Date();
+            String clientRequest;
+            ArrayList<String> listOfNames;
+            SimpleDateFormat format = new SimpleDateFormat("dd:mm:yyyy");
+            writer = new OutputStreamWriter(connection.getOutputStream());
+            reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
 
-        // Check if name exists
-        boolean nameExists = false;
-        listOfNames = checkName(clientInput);
-        System.out.println("listOfNames size: " + listOfNames.size());
-        for (int i = 0; i < listOfNames.size(); i++) {
-            System.out.println("ClientInput: " + clientInput + " ,Name: " + listOfNames.get(i));
-            if (clientInput.equals(listOfNames.get(i))) {
-                nameExists = true;
-            } else {
-                nameExists = false;
+            // Checking for name
+            clientInput = reader.readLine();
+            clientInput.replaceAll(" ", "");
+            if (!(clientInput.toLowerCase().equals("hello"))) {
+                sendMessage(ERROR_ZERO);
+                connection.close();
             }
-        }
-        System.out.println("Name exists: " + nameExists);
 
-        if (nameExists) {
-            sendMessage("BEGIN TWIN");
-            // check twin func
-            listOfNames = checkTwin(tmpDate);
+
+            sendMessage("What is your name ?");
+            server_state = SERVER_PROTOCOL.RECEIVE_NAME;
+            clientInput = reader.readLine();
+            clientInput.replaceAll(" ", "");
+            //String tmpdate = " ";
+            // Continue
+
+            // Check if name exists
+            boolean nameExists = false;
+            listOfNames = checkName(clientInput);
+            System.out.println("listOfNames size: " + listOfNames.size());
             for (int i = 0; i < listOfNames.size(); i++) {
-                System.out.println(listOfNames.get(i));
-                sendMessage(listOfNames.get(i));
-            }
-            sendMessage("END TWIN");
-
-            server_state = SERVER_PROTOCOL.RECEIVE_REQ;
-
-            requestOption(connection, listOfNames, tmpDate, reader);
-
-
-            System.out.println("Closing connection");
-            connection.close();
-        } else {
-            server_state = SERVER_PROTOCOL.RECEIVE_DATE;
-            sendMessage("What is your DOB");
-            clientDate = reader.readLine();
-
-            SimpleDateFormat fromUser = new SimpleDateFormat("dd:MM:yyyy");
-            SimpleDateFormat myFormat = new SimpleDateFormat("dd:MM:yyyy");
-            SimpleDateFormat testFormart = new SimpleDateFormat("yyyy");
-
-            try {
-                String reformattedStr = myFormat.format(fromUser.parse(clientDate));
-                String testString = testFormart.format(fromUser.parse(clientDate));
-                if ((Integer.parseInt(testString) > 1850) && (Integer.parseInt(testString) < 2020)) {
-                    System.out.println(testString);
-                    System.out.println(reformattedStr);
-                    tmpDate = reformattedStr;
-                    storeUserDetails(clientInput, reformattedStr);
+                System.out.println("ClientInput: " + clientInput + " ,Name: " + listOfNames.get(i));
+                if (clientInput.equals(listOfNames.get(i))) {
+                    nameExists = true;
                 } else {
-                    sendMessage(ERROR_TWO);
+                    nameExists = false;
                 }
-            } catch (ParseException e) {
-                sendMessage(ERROR_TWO);
-                e.printStackTrace();
             }
+            System.out.println("Name exists: " + nameExists);
 
-            sendMessage("BEGIN TWIN");
-            // check twin func
-            listOfNames = checkTwin(tmpDate);
-            for (int i = 0; i < listOfNames.size(); i++) {
-                System.out.println(listOfNames.get(i));
-                sendMessage(listOfNames.get(i));
+            if (nameExists) {
+                sendMessage("BEGIN TWIN");
+                // check twin func
+                listOfNames = checkTwin(tmpDate);
+                for (int i = 0; i < listOfNames.size(); i++) {
+                    System.out.println(listOfNames.get(i));
+                    sendMessage(listOfNames.get(i));
+                }
+                sendMessage("END TWIN");
+
+                server_state = SERVER_PROTOCOL.RECEIVE_REQ;
+
+                requestOption(connection, listOfNames, tmpDate, reader);
+
+
+                System.out.println("Closing connection");
+                connection.close();
+            } else {
+                server_state = SERVER_PROTOCOL.RECEIVE_DATE;
+                sendMessage("What is your DOB");
+                clientDate = reader.readLine();
+
+                SimpleDateFormat fromUser = new SimpleDateFormat("dd:MM:yyyy");
+                SimpleDateFormat myFormat = new SimpleDateFormat("dd:MM:yyyy");
+                SimpleDateFormat testFormart = new SimpleDateFormat("yyyy");
+
+                try {
+                    String reformattedStr = myFormat.format(fromUser.parse(clientDate));
+                    String testString = testFormart.format(fromUser.parse(clientDate));
+                    if ((Integer.parseInt(testString) > 1899) && (Integer.parseInt(testString) < 2020)) {
+                        System.out.println(testString);
+                        System.out.println(reformattedStr);
+                        tmpDate = reformattedStr;
+                        storeUserDetails(clientInput, reformattedStr);
+                    } else {
+                        sendMessage(ERROR_TWO);
+                    }
+                } catch (ParseException e) {
+                    sendMessage(ERROR_TWO);
+                    e.printStackTrace();
+                }
+
+                sendMessage("BEGIN TWIN");
+                // check twin func
+                listOfNames = checkTwin(tmpDate);
+                for (int i = 0; i < listOfNames.size(); i++) {
+                    System.out.println(listOfNames.get(i));
+                    sendMessage(listOfNames.get(i));
+                }
+                sendMessage("END TWIN");
+
+                server_state = SERVER_PROTOCOL.RECEIVE_REQ;
+
+                requestOption(connection, listOfNames, tmpDate, reader);
+
+
+                System.out.println("Closing connection");
+                connection.close();
             }
-            sendMessage("END TWIN");
-
-            server_state = SERVER_PROTOCOL.RECEIVE_REQ;
-
-            requestOption(connection, listOfNames, tmpDate, reader);
-
-
-            System.out.println("Closing connection");
-            connection.close();
+            // Checking for date
+        }catch (SocketException se)
+        {
+            server_state = SERVER_PROTOCOL.NEW;
+            conn = serverSocket.accept();
+            session(conn);
         }
-        // Checking for date
-
     }
 
     /**
@@ -313,7 +330,14 @@ public class Server {
             System.err.println("could not determine local host name");
         }
         Server server = new Server(port);
-        server.start();
+        try {
+            server.start();
+        }catch (SocketException se)
+        {
+            //server.start();
+            System.out.println("Connection disrupted with client.");
+            se.printStackTrace();
+        }
         System.err.println("Server loop terminated!"); // not supposed to happen
     }
 }
