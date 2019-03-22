@@ -4,10 +4,14 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Server {
 
@@ -21,6 +25,7 @@ public class Server {
     private BufferedReader bufferedReader;
     private PrintWriter printWriter;
     private String tmpName;
+    private String clientInput;
 
     /**
      * Initialise a new Twins server. To start the server, call start().
@@ -86,6 +91,16 @@ public class Server {
         fileWriter.close();
     }
 
+
+    public void deleteUser(String lineToDelete)throws IOException {
+            File file = new File("db.txt");
+            List<String> out = Files.lines(file.toPath())
+                    .filter(line -> !line.contains(lineToDelete))
+                    .collect(Collectors.toList());
+            Files.write(file.toPath(), out, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+
     public void requestOption(Socket connection, ArrayList<String> listOfNames, String tmpdate, BufferedReader reader) throws IOException
     {
         String clientRequest = reader.readLine();
@@ -103,7 +118,7 @@ public class Server {
                 requestOption(connection, listOfNames, tmpdate, reader);
                 break;
             case "Delete me" :
-                sendMessage("Fk you no deleting here");
+                deleteUser(clientInput);
                 break;
             default :
                 break;
@@ -116,7 +131,7 @@ public class Server {
      * @throws IOException 
      */
     public void session(Socket connection) throws IOException {
-        String clientInput;
+
         String clientDate;
         Date date = new Date();
         String clientRequest;
@@ -177,7 +192,7 @@ public class Server {
          server_state = SERVER_PROTOCOL.RECEIVE_REQ;
 
          requestOption(connection, listOfNames, tmpdate, reader);
-         
+
 
         System.out.println("Closing connection");
         connection.close();
